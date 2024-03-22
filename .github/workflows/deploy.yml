@@ -6,7 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "test"
-      - run: ls
+      - run: ls -a
+      - run: pwd
       - name: diff
         uses: youyo/aws-cdk-github-actions@v2
         with:
