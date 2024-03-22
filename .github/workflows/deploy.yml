@@ -6,3 +6,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "test"
+      - name: diff
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: 'diff'
+          actions_comment: true
+        env:
+          AWS_DEFAULT_REGION: 'us-east-2'
