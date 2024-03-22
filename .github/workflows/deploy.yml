@@ -5,10 +5,11 @@ jobs:
   CDK-Deploy:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "test"
+      - name: checkout
+        uses: actions/checkout@v3
       - run: ls -a
       - run: pwd
-      - name: diff
+      - name: cdk diff
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: 'diff'
