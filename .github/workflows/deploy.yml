@@ -1,0 +1,8 @@
+name: Deploy
+run-name: Peanut Gallery CDK Deploy
+on: [push]
+jobs:
+  CDK-Deploy:
+    runs-on: ubuntu-latest
+    steps:
+      run: echo "test"
