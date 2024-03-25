@@ -7,7 +7,6 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     const table = new dynamodb.TableV2(this, "MoviesTable", {
-      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       globalSecondaryIndexes: [
         {
           indexName: "moviesByScore",
@@ -18,6 +17,8 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
           sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
         },
       ],
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      tableName: 'MoviesTable',
     });
   }
 }
