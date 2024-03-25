@@ -31,6 +31,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
 
     const graphqlLambda = new lambda.Function(this, getName("GraphQLLambda"), {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+      functionName: getName("GraphQLLambda"),
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
     });
