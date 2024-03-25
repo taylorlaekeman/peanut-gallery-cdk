@@ -23,7 +23,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       tableName: getName("MoviesTable"),
     });
 
-    const graphqlLambdaS3 = new s3.Bucket(this, getName("GraphQLLambdaBucket"));
+    const graphqlLambdaS3 = new s3.Bucket(this, getName("GraphQLLambdaBucket"), { bucketName: getName("GraphQLLambdaBucket").toLowerCase() });
 
     const graphqlLambda = new lambda.Function(this, getName("GraphQLLambda"), {
       code: lambda.Code.fromBucket(
