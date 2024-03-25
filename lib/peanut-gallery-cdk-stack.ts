@@ -30,8 +30,8 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
     );
 
     const graphqlLambda = new lambda.Function(this, getName("GraphQLLambda"), {
-      code: lambda.Code.fromBucket(graphqlLambdaS3, "code.zip"),
-      handler: "index.main",
+      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+      handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
     });
   }
@@ -40,3 +40,9 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
 function getName(name: string): string {
   return `PeanutGallery${name}`;
 }
+
+const DEFAULT_HANDLER_CODE = `
+exports.handler = async () => {
+  console.log('default handler not yet overwritten');
+};
+`;
