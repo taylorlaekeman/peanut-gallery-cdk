@@ -20,7 +20,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
         },
       ],
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-      tableName: "MoviesTable",
+      tableName: getName("MoviesTable"),
     });
 
     const graphqlLambdaS3 = new s3.Bucket(this, getName("GraphQLLambdaBucket"));
