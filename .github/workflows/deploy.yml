@@ -2,17 +2,20 @@ name: Deploy
 run-name: Peanut Gallery CDK Deploy
 on: [push]
 jobs:
-  CDK-Deploy:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - name: checkout
         uses: actions/checkout@v3
-      - run: ls -a
-      - run: pwd
+      - name: authenticate with aws
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::256470578440:role/PeanutGalleryGithubActionsDeployer
       - name: cdk diff
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: 'diff'
           actions_comment: true
-        env:
-          AWS_DEFAULT_REGION: 'us-east-2'
