@@ -2,8 +2,7 @@ name: Deploy
 run-name: Peanut Gallery CDK Deploy
 on:
   push:
-    branches:
-      main
+    branches: main
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,16 +16,8 @@ jobs:
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::256470578440:role/PeanutGalleryGithubActionsCDKDeployer
-      - name: cdk diff
-        uses: youyo/aws-cdk-github-actions@v2
-        with:
-          cdk_subcommand: 'diff'
-      - name: cdk synth
-        uses: youyo/aws-cdk-github-actions@v2
-        with:
-          cdk_subcommand: 'synth'
       - name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
         with:
-          cdk_subcommand: 'deploy'
-          cdk_args: '--require-approval never'
+          cdk_subcommand: "deploy"
+          cdk_args: "--require-approval never"
