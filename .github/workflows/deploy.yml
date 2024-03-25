@@ -13,7 +13,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-region: us-east-2
-          role-to-assume: arn:aws:iam::256470578440:role/PeanutGalleryGithubActionsDeployer
+          role-to-assume: arn:aws:iam::256470578440:role/PeanutGalleryGithubActionsCDKDeployer
       - name: cdk diff
         uses: youyo/aws-cdk-github-actions@v2
         with:
