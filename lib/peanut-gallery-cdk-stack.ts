@@ -35,6 +35,13 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
     });
+
+    const uiBucket = new s3.Bucket(this, getName("UIBucket"), {
+      bucketName: "peanutgallery.taylorlaekeman.com",
+      enforceSSL: true,
+      websiteErrorDocument: "index.html",
+      websiteIndexDocument: "index.html",
+    });
   }
 }
 
