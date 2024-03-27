@@ -60,6 +60,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         },
+        domainNames: ["peanutgallery.taylorlaekeman.com"],
       }
     );
   }
