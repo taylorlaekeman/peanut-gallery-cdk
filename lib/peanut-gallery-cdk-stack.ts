@@ -46,6 +46,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
         restrictPublicBuckets: false,
       },
       bucketName: "peanutgallery.taylorlaekeman.com",
+      publicReadAccess: true,
       websiteErrorDocument: "index.html",
       websiteIndexDocument: "index.html",
     });
