@@ -38,6 +38,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
     });
 
+    /*
     const uiBucket = new s3.Bucket(this, getName("UIBucket"), {
       bucketName: "peanutgallery.taylorlaekeman.com",
       publicReadAccess: true,
@@ -56,6 +57,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
         },
       }
     );
+    */
   }
 }
 
