@@ -39,8 +39,13 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
     });
 
     const uiBucket = new s3.Bucket(this, getName("UIBucket"), {
+      blockPublicAccess: {
+        blockPublicAcls: false,
+        blockPublicPolicy: false,
+        ignorePublicAcls: false,
+        restrictPublicBuckets: false,
+      },
       bucketName: "peanutgallery.taylorlaekeman.com",
-      publicReadAccess: true,
       websiteErrorDocument: "index.html",
       websiteIndexDocument: "index.html",
     });
