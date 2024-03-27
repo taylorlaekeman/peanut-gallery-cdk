@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as certificatemanager from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -55,6 +56,11 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       this,
       getName("UIDistribution"),
       {
+        certificate: certificatemanager.Certificate.fromCertificateArn(
+          this,
+          "TaylorLaekemanDomainCertificate",
+          "arn:aws:acm:us-east-1:256470578440:certificate/a09f4bea-a227-4c46-bcba-2fa4719a1a03"
+        ),
         defaultBehavior: {
           origin: new origins.S3Origin(uiBucket),
           viewerProtocolPolicy:
