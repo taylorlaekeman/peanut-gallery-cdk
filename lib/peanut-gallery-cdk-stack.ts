@@ -1,4 +1,6 @@
 import * as cdk from "aws-cdk-lib";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -42,6 +44,18 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       websiteErrorDocument: "index.html",
       websiteIndexDocument: "index.html",
     });
+
+    const uiDistribution = new cloudfront.Distribution(
+      this,
+      getName("UIDistribution"),
+      {
+        defaultBehavior: {
+          origin: new origins.S3Origin(uiBucket),
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        },
+      }
+    );
   }
 }
 
