@@ -62,6 +62,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
           "arn:aws:acm:us-east-1:256470578440:certificate/a09f4bea-a227-4c46-bcba-2fa4719a1a03"
         ),
         defaultBehavior: {
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           origin: new origins.S3Origin(uiBucket),
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
