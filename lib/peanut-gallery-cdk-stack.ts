@@ -109,6 +109,9 @@ class PeanutGalleryAPI extends Construct {
       this,
       getName("Gateway", { prefix: name }),
       {
+        defaultCorsPreflightOptions: {
+          allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        },
         restApiName: getName("Gateway", { prefix: name }),
       }
     );
@@ -118,7 +121,6 @@ class PeanutGalleryAPI extends Construct {
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
-    api.root.addMethod("OPTIONS");
     api.root.addMethod("POST", gatewayLambdaIntegration);
   }
 }
