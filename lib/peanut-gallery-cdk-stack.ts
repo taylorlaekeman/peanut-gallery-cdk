@@ -118,6 +118,7 @@ class PeanutGalleryAPI extends Construct {
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
+    api.root.addMethod("OPTIONS");
     api.root.addMethod("POST", gatewayLambdaIntegration);
   }
 }
