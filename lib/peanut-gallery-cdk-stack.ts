@@ -112,6 +112,14 @@ class PeanutGalleryAPI extends Construct {
         defaultCorsPreflightOptions: {
           allowOrigins: apigateway.Cors.ALL_ORIGINS,
         },
+        domainName: {
+          domainName: "api.peanutgallery.taylorlaekeman.com",
+          certificate: certificatemanager.Certificate.fromCertificateArn(
+            this,
+            "TaylorLaekemanDomainCertificate",
+            "arn:aws:acm:us-east-2:256470578440:certificate/2fefe87a-cad4-49fa-8885-d4d340a88a51"
+          ),
+        },
         restApiName: getName("Gateway", { prefix: name }),
       }
     );
