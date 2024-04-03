@@ -67,7 +67,7 @@ class PeanutGalleryAPI extends Construct {
     const name = getName("API");
     super(scope, name);
 
-    const table = new dynamodb.TableV2(
+    const moviesTable = new dynamodb.TableV2(
       this,
       getName("MoviesTable", { prefix: name }),
       {
@@ -86,15 +86,11 @@ class PeanutGalleryAPI extends Construct {
       }
     );
 
-    const graphqlLambdaS3 = new s3.Bucket(
-      this,
-      getName("GraphQLLambdaBucket", { prefix: name }),
-      {
-        bucketName: getName("GraphQLLambdaBucket", {
-          prefix: name,
-        }).toLowerCase(),
-      }
-    );
+    new s3.Bucket(this, getName("GraphQLLambdaBucket", { prefix: name }), {
+      bucketName: getName("GraphQLLambdaBucket", {
+        prefix: name,
+      }).toLowerCase(),
+    });
 
     const graphqlLambda = new lambda.Function(
       this,
@@ -107,6 +103,7 @@ class PeanutGalleryAPI extends Construct {
         timeout: cdk.Duration.seconds(10),
       }
     );
+    moviesTable.grantReadWriteData(graphqlLambda);
 
     const api = new apigateway.RestApi(
       this,
