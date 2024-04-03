@@ -104,6 +104,7 @@ class PeanutGalleryAPI extends Construct {
         functionName: getName("GraphQLLambda", { prefix: name }),
         handler: "index.handler",
         runtime: lambda.Runtime.NODEJS_18_X,
+        timeout: cdk.Duration.seconds(10),
       }
     );
 
