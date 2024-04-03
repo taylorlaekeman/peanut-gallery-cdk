@@ -10,36 +10,8 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    const table = new dynamodb.TableV2(this, getName("MoviesTable"), {
-      globalSecondaryIndexes: [
-        {
-          indexName: "moviesByScore",
-          partitionKey: {
-            name: "year-week",
-            type: dynamodb.AttributeType.STRING,
-          },
-          sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
-        },
-      ],
-      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-      tableName: getName("MoviesTable"),
-    });
-
-    const graphqlLambdaS3 = new s3.Bucket(
-      this,
-      getName("GraphQLLambdaBucket"),
-      { bucketName: getName("GraphQLLambdaBucket").toLowerCase() }
-    );
-
-    const graphqlLambda = new lambda.Function(this, getName("GraphQLLambda"), {
-      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      functionName: getName("GraphQLLambda"),
-      handler: "index.handler",
-      runtime: lambda.Runtime.NODEJS_18_X,
-    });
-
-    const ui = new PeanutGalleryUI(this, getName("UI"));
+    const ui = new PeanutGalleryUI(this);
+    const api = new PeanutGalleryAPI(this);
   }
 }
 
@@ -51,7 +23,8 @@ function getName(
 }
 
 class PeanutGalleryUI extends Construct {
-  constructor(scope: Construct, name: string) {
+  constructor(scope: Construct) {
+    const name = getName("UI");
     super(scope, name);
 
     const bucket = new s3.Bucket(this, getName("Bucket", { prefix: name }), {
@@ -83,6 +56,53 @@ class PeanutGalleryUI extends Construct {
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         },
         domainNames: ["peanutgallery.taylorlaekeman.com"],
+      }
+    );
+  }
+}
+
+class PeanutGalleryAPI extends Construct {
+  constructor(scope: Construct) {
+    const name = getName("API");
+    super(scope, name);
+
+    const table = new dynamodb.TableV2(
+      this,
+      getName("MoviesTable", { prefix: name }),
+      {
+        globalSecondaryIndexes: [
+          {
+            indexName: "moviesByScore",
+            partitionKey: {
+              name: "year-week",
+              type: dynamodb.AttributeType.STRING,
+            },
+            sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
+          },
+        ],
+        partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+        tableName: getName("MoviesTable", { prefix: name }),
+      }
+    );
+
+    const graphqlLambdaS3 = new s3.Bucket(
+      this,
+      getName("GraphQLLambdaBucket", { prefix: name }),
+      {
+        bucketName: getName("GraphQLLambdaBucket", {
+          prefix: name,
+        }).toLowerCase(),
+      }
+    );
+
+    const graphqlLambda = new lambda.Function(
+      this,
+      getName("GraphQLLambda", { prefix: name }),
+      {
+        code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+        functionName: getName("GraphQLLambda"),
+        handler: "index.handler",
+        runtime: lambda.Runtime.NODEJS_18_X,
       }
     );
   }
