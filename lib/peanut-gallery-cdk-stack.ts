@@ -101,7 +101,7 @@ class PeanutGalleryAPI extends Construct {
       getName("GraphQLLambda", { prefix: name }),
       {
         code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-        functionName: getName("GraphQLLambda"),
+        functionName: getName("GraphQLLambda", { prefix: name }),
         handler: "index.handler",
         runtime: lambda.Runtime.NODEJS_18_X,
       }
