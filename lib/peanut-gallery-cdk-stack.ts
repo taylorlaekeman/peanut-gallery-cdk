@@ -1,3 +1,4 @@
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as cdk from "aws-cdk-lib";
 import * as certificatemanager from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
@@ -105,6 +106,21 @@ class PeanutGalleryAPI extends Construct {
         runtime: lambda.Runtime.NODEJS_18_X,
       }
     );
+
+    const api = new apigateway.RestApi(
+      this,
+      getName("Gateway", { prefix: name }),
+      {
+        restApiName: getName("Gateway", { prefix: name }),
+      }
+    );
+
+    const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
+      graphqlLambda,
+      { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
+    );
+
+    api.root.addMethod("POST", gatewayLambdaIntegration);
   }
 }
 
