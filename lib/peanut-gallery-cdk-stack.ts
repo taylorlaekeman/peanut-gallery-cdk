@@ -39,7 +39,22 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
     });
 
-    const uiBucket = new s3.Bucket(this, getName("UIBucket"), {
+    const ui = new PeanutGalleryUI(this, getName("UI"));
+  }
+}
+
+function getName(
+  name: string,
+  { prefix = "PeanutGallery" }: { prefix?: string } = {}
+): string {
+  return `${prefix}${name}`;
+}
+
+class PeanutGalleryUI extends Construct {
+  constructor(scope: Construct, name: string) {
+    super(scope, name);
+
+    const bucket = new s3.Bucket(this, getName("Bucket", { prefix: name }), {
       blockPublicAccess: {
         blockPublicAcls: false,
         blockPublicPolicy: false,
@@ -52,9 +67,9 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       websiteIndexDocument: "index.html",
     });
 
-    const uiDistribution = new cloudfront.Distribution(
+    const distribution = new cloudfront.Distribution(
       this,
-      getName("UIDistribution"),
+      getName("Distribution", { prefix: name }),
       {
         certificate: certificatemanager.Certificate.fromCertificateArn(
           this,
@@ -63,7 +78,7 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
         ),
         defaultBehavior: {
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          origin: new origins.S3Origin(uiBucket),
+          origin: new origins.S3Origin(bucket),
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         },
@@ -71,10 +86,6 @@ export class PeanutGalleryCdkStack extends cdk.Stack {
       }
     );
   }
-}
-
-function getName(name: string): string {
-  return `PeanutGallery${name}`;
 }
 
 const DEFAULT_HANDLER_CODE = `
