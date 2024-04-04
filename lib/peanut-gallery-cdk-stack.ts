@@ -129,7 +129,7 @@ class PeanutGalleryGraphqlLambda extends Construct {
       functionName: "PeanutGalleryGraphQL",
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(10),
+      timeout: cdk.Duration.seconds(15),
     });
 
     this.lambda.addLayers(
