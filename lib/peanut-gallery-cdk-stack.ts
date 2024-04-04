@@ -55,7 +55,7 @@ class PeanutGalleryApi extends Construct {
   constructor(scope: Construct) {
     super(scope, "Api");
 
-    const moviesTable = new dynamodb.TableV2(this, "MoviesTable", {
+    const moviesTable = new dynamodb.TableV2(this, "Movies", {
       globalSecondaryIndexes: [
         {
           indexName: "moviesByScore",
@@ -78,7 +78,7 @@ class PeanutGalleryApi extends Construct {
         },
       ],
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-      tableName: "PeanutGalleryMoviesTable",
+      tableName: "PeanutGalleryMovies",
     });
 
     const lambda = new PeanutGalleryGraphqlLambda(this);
