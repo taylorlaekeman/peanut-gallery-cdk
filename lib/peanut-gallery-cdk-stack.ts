@@ -145,7 +145,7 @@ class PeanutGalleryGraphqlLambda extends Construct {
     const policyStatement = new iam.PolicyStatement({
       actions: ["dynamodb:Query", "dynamodb:PutItem"],
       effect: iam.Effect.ALLOW,
-      resources: [table.tableArn],
+      resources: [table.tableArn, `${table.tableArn}/index/*`],
     });
     this.lambda.addToRolePolicy(policyStatement);
   }
