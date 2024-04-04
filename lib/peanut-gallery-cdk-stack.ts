@@ -6,6 +6,7 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
 export class PeanutGalleryCdkStack extends cdk.Stack {
@@ -92,18 +93,8 @@ class PeanutGalleryAPI extends Construct {
       }).toLowerCase(),
     });
 
-    const graphqlLambda = new lambda.Function(
-      this,
-      getName("GraphQLLambda", { prefix: name }),
-      {
-        code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-        functionName: getName("GraphQLLambda", { prefix: name }),
-        handler: "index.handler",
-        runtime: lambda.Runtime.NODEJS_18_X,
-        timeout: cdk.Duration.seconds(10),
-      }
-    );
-    moviesTable.grantReadWriteData(graphqlLambda);
+    const lambda = new PeanutGalleryAPILambda(this);
+    moviesTable.grantReadWriteData(lambda.lambda);
 
     const api = new apigateway.RestApi(
       this,
@@ -125,11 +116,50 @@ class PeanutGalleryAPI extends Construct {
     );
 
     const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
-      graphqlLambda,
+      lambda.lambda,
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
     api.root.addMethod("POST", gatewayLambdaIntegration);
+  }
+}
+
+class PeanutGalleryAPILambda extends Construct {
+  lambda: lambda.Function;
+
+  constructor(scope: Construct) {
+    const name = getName("APILambda");
+    super(scope, name);
+
+    const tmdbApiKeyParameter = new ssm.StringParameter(
+      this,
+      getName("TMDBApiKey", { prefix: name }),
+      {
+        parameterName: getName("TMDBApiKey", { prefix: name }),
+        stringValue: "placeholder-tmdb-api-key",
+      }
+    );
+
+    this.lambda = new lambda.Function(
+      this,
+      getName("Lambda", { prefix: name }),
+      {
+        code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+        environment: { TMDB_API_KEY: tmdbApiKeyParameter.parameterName },
+        functionName: "PeanutGalleryAPIGraphQLLambda",
+        handler: "index.handler",
+        runtime: lambda.Runtime.NODEJS_18_X,
+        timeout: cdk.Duration.seconds(10),
+      }
+    );
+
+    this.lambda.addLayers(
+      lambda.LayerVersion.fromLayerVersionArn(
+        this,
+        "ParametersAndSecretsLambdaExtension",
+        "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
+      )
+    );
   }
 }
 
