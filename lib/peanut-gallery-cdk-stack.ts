@@ -64,6 +64,17 @@ class PeanutGalleryApi extends Construct {
           },
           sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
         },
+        {
+          indexName: "moviesByPopularity",
+          partitionKey: {
+            name: "year-week",
+            type: dynamodb.AttributeType.STRING,
+          },
+          sortKey: {
+            name: "popularity-id",
+            type: dynamodb.AttributeType.STRING,
+          },
+        },
       ],
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       tableName: "PeanutGalleryMoviesTable",
