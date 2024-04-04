@@ -12,24 +12,16 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    const ui = new PeanutGalleryUI(this);
-    const api = new PeanutGalleryAPI(this);
+    const ui = new PeanutGalleryUi(this);
+    const api = new PeanutGalleryApi(this);
   }
 }
 
-function getName(
-  name: string,
-  { prefix = "PeanutGallery" }: { prefix?: string } = {}
-): string {
-  return `${prefix}${name}`;
-}
-
-class PeanutGalleryUI extends Construct {
+class PeanutGalleryUi extends Construct {
   constructor(scope: Construct) {
-    const name = getName("UI");
-    super(scope, name);
+    super(scope, "Ui");
 
-    const bucket = new s3.Bucket(this, getName("Bucket", { prefix: name }), {
+    const bucket = new s3.Bucket(this, "CodeBucket", {
       blockPublicAccess: {
         blockPublicAcls: false,
         blockPublicPolicy: false,
@@ -42,78 +34,58 @@ class PeanutGalleryUI extends Construct {
       websiteIndexDocument: "index.html",
     });
 
-    const distribution = new cloudfront.Distribution(
-      this,
-      getName("Distribution", { prefix: name }),
-      {
-        certificate: certificatemanager.Certificate.fromCertificateArn(
-          this,
-          "TaylorLaekemanDomainCertificate",
-          "arn:aws:acm:us-east-1:256470578440:certificate/a09f4bea-a227-4c46-bcba-2fa4719a1a03"
-        ),
-        defaultBehavior: {
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          origin: new origins.S3Origin(bucket),
-          viewerProtocolPolicy:
-            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        },
-        domainNames: ["peanutgallery.taylorlaekeman.com"],
-      }
-    );
+    const distribution = new cloudfront.Distribution(this, "Cdn", {
+      certificate: certificatemanager.Certificate.fromCertificateArn(
+        this,
+        "TaylorLaekemanDomainCertificate",
+        "arn:aws:acm:us-east-1:256470578440:certificate/a09f4bea-a227-4c46-bcba-2fa4719a1a03"
+      ),
+      defaultBehavior: {
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        origin: new origins.S3Origin(bucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      domainNames: ["peanutgallery.taylorlaekeman.com"],
+    });
   }
 }
 
-class PeanutGalleryAPI extends Construct {
+class PeanutGalleryApi extends Construct {
   constructor(scope: Construct) {
-    const name = getName("API");
-    super(scope, name);
+    super(scope, "Api");
 
-    const moviesTable = new dynamodb.TableV2(
-      this,
-      getName("MoviesTable", { prefix: name }),
-      {
-        globalSecondaryIndexes: [
-          {
-            indexName: "moviesByScore",
-            partitionKey: {
-              name: "year-week",
-              type: dynamodb.AttributeType.STRING,
-            },
-            sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
+    const moviesTable = new dynamodb.TableV2(this, "MoviesTable", {
+      globalSecondaryIndexes: [
+        {
+          indexName: "moviesByScore",
+          partitionKey: {
+            name: "year-week",
+            type: dynamodb.AttributeType.STRING,
           },
-        ],
-        partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-        tableName: getName("MoviesTable", { prefix: name }),
-      }
-    );
-
-    new s3.Bucket(this, getName("GraphQLLambdaBucket", { prefix: name }), {
-      bucketName: getName("GraphQLLambdaBucket", {
-        prefix: name,
-      }).toLowerCase(),
+          sortKey: { name: "score-id", type: dynamodb.AttributeType.STRING },
+        },
+      ],
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      tableName: "PeanutGalleryAPIMoviesTable",
     });
 
-    const lambda = new PeanutGalleryAPILambda(this);
+    const lambda = new PeanutGalleryGraphqlLambda(this);
     moviesTable.grantReadWriteData(lambda.lambda);
 
-    const api = new apigateway.RestApi(
-      this,
-      getName("Gateway", { prefix: name }),
-      {
-        defaultCorsPreflightOptions: {
-          allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        },
-        domainName: {
-          domainName: "api.peanutgallery.taylorlaekeman.com",
-          certificate: certificatemanager.Certificate.fromCertificateArn(
-            this,
-            "TaylorLaekemanDomainCertificate",
-            "arn:aws:acm:us-east-2:256470578440:certificate/2fefe87a-cad4-49fa-8885-d4d340a88a51"
-          ),
-        },
-        restApiName: getName("Gateway", { prefix: name }),
-      }
-    );
+    const api = new apigateway.RestApi(this, "Gateway", {
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      },
+      domainName: {
+        domainName: "api.peanutgallery.taylorlaekeman.com",
+        certificate: certificatemanager.Certificate.fromCertificateArn(
+          this,
+          "TaylorLaekemanDomainCertificate",
+          "arn:aws:acm:us-east-2:256470578440:certificate/2fefe87a-cad4-49fa-8885-d4d340a88a51"
+        ),
+      },
+      restApiName: "PeanutGalleryAPIGateway",
+    });
 
     const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
       lambda.lambda,
@@ -124,34 +96,29 @@ class PeanutGalleryAPI extends Construct {
   }
 }
 
-class PeanutGalleryAPILambda extends Construct {
+class PeanutGalleryGraphqlLambda extends Construct {
   lambda: lambda.Function;
 
   constructor(scope: Construct) {
-    const name = getName("APILambda");
-    super(scope, name);
+    super(scope, "GraphqlLambda");
 
-    const tmdbApiKeyParameter = new ssm.StringParameter(
-      this,
-      getName("TMDBApiKey", { prefix: name }),
-      {
-        parameterName: getName("TMDBApiKey", { prefix: name }),
-        stringValue: "placeholder-tmdb-api-key",
-      }
-    );
+    const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
+      parameterName: "PeanutGalleryTmdbApiKey",
+      stringValue: "placeholder-tmdb-api-key",
+    });
 
-    this.lambda = new lambda.Function(
-      this,
-      getName("Lambda", { prefix: name }),
-      {
-        code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-        environment: { TMDB_API_KEY: tmdbApiKeyParameter.parameterName },
-        functionName: "PeanutGalleryAPIGraphQLLambda",
-        handler: "index.handler",
-        runtime: lambda.Runtime.NODEJS_18_X,
-        timeout: cdk.Duration.seconds(10),
-      }
-    );
+    new s3.Bucket(this, "GraphQLLambdaCodeBucket", {
+      bucketName: "PeanutGalleryAPIGraphQLLambdaBucket".toLowerCase(),
+    });
+
+    this.lambda = new lambda.Function(this, "GraphqlLambda", {
+      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+      environment: { TMDB_API_KEY: tmdbApiKeyParameter.parameterName },
+      functionName: "PeanutGalleryAPIGraphQLLambda",
+      handler: "index.handler",
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(10),
+    });
 
     this.lambda.addLayers(
       lambda.LayerVersion.fromLayerVersionArn(
