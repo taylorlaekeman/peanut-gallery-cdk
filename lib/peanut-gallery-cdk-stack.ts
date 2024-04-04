@@ -4,6 +4,7 @@ import * as certificatemanager from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
@@ -81,7 +82,7 @@ class PeanutGalleryApi extends Construct {
     });
 
     const lambda = new PeanutGalleryGraphqlLambda(this);
-    moviesTable.grantReadWriteData(lambda.lambda);
+    lambda.grantMovieTablePermissions(moviesTable);
 
     const api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
@@ -138,6 +139,15 @@ class PeanutGalleryGraphqlLambda extends Construct {
         "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
       )
     );
+  }
+
+  grantMovieTablePermissions(table: dynamodb.TableV2) {
+    const policyStatement = new iam.PolicyStatement({
+      actions: ["dynamodb:Query", "dynamodb:PutItem"],
+      effect: iam.Effect.ALLOW,
+      resources: [table.tableArn],
+    });
+    this.lambda.addToRolePolicy(policyStatement);
   }
 }
 
