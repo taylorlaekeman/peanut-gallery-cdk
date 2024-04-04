@@ -66,7 +66,7 @@ class PeanutGalleryApi extends Construct {
         },
       ],
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-      tableName: "PeanutGalleryAPIMoviesTable",
+      tableName: "PeanutGalleryMoviesTable",
     });
 
     const lambda = new PeanutGalleryGraphqlLambda(this);
@@ -84,7 +84,7 @@ class PeanutGalleryApi extends Construct {
           "arn:aws:acm:us-east-2:256470578440:certificate/2fefe87a-cad4-49fa-8885-d4d340a88a51"
         ),
       },
-      restApiName: "PeanutGalleryAPIGateway",
+      restApiName: "PeanutGalleryAPI",
     });
 
     const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
@@ -107,14 +107,14 @@ class PeanutGalleryGraphqlLambda extends Construct {
       stringValue: "placeholder-tmdb-api-key",
     });
 
-    new s3.Bucket(this, "GraphQLLambdaCodeBucket", {
-      bucketName: "PeanutGalleryAPIGraphQLLambdaBucket".toLowerCase(),
+    new s3.Bucket(this, "GraphQLCodeBucket", {
+      bucketName: "peanut-gallery-graphql-code",
     });
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
       environment: { TMDB_API_KEY: tmdbApiKeyParameter.parameterName },
-      functionName: "PeanutGalleryAPIGraphQLLambda",
+      functionName: "PeanutGalleryGraphQL",
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
       timeout: cdk.Duration.seconds(10),
