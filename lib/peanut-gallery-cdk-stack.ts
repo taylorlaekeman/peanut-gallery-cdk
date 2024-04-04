@@ -125,7 +125,7 @@ class PeanutGalleryGraphqlLambda extends Construct {
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      environment: { TMDB_API_KEY: tmdbApiKeyParameter.parameterName },
+      environment: { TMDB_API_KEY: tmdbApiKeyParameter.stringValue },
       functionName: "PeanutGalleryGraphQL",
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
