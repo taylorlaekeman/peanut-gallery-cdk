@@ -7,6 +7,9 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
+import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
@@ -55,6 +58,8 @@ class PeanutGalleryApi extends Construct {
   constructor(scope: Construct) {
     super(scope, "Api");
 
+    const lambda = new PeanutGalleryGraphqlLambda(this);
+
     const moviesTable = new dynamodb.TableV2(this, "Movies", {
       globalSecondaryIndexes: [
         {
@@ -80,9 +85,10 @@ class PeanutGalleryApi extends Construct {
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       tableName: "PeanutGalleryMovies",
     });
-
-    const lambda = new PeanutGalleryGraphqlLambda(this);
     lambda.grantMovieTablePermissions(moviesTable);
+
+    const populateMoviesBus = new PopulateMovieMessageBus(this);
+    lambda.grantPopulateMovieRequestTopicPermissions(populateMoviesBus.topic);
 
     const api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
@@ -148,6 +154,32 @@ class PeanutGalleryGraphqlLambda extends Construct {
       resources: [table.tableArn, `${table.tableArn}/index/*`],
     });
     this.lambda.addToRolePolicy(policyStatement);
+  }
+
+  grantPopulateMovieRequestTopicPermissions(topic: sns.Topic) {
+    const policyStatement = new iam.PolicyStatement({
+      actions: ["sns:Publish"],
+      effect: iam.Effect.ALLOW,
+      resources: [topic.topicArn],
+    });
+    this.lambda.addToRolePolicy(policyStatement);
+  }
+}
+
+class PopulateMovieMessageBus extends Construct {
+  readonly topic: sns.Topic;
+  readonly queue: sqs.Queue;
+
+  constructor(scope: Construct) {
+    super(scope, "PopulateMovieMessageBus");
+
+    this.topic = new sns.Topic(this, "PopulateMovieRequestTopic", {
+      topicName: "PopulateMovieRequestTopic",
+    });
+    this.queue = new sqs.Queue(this, "PopulateMovieRequestQueue", {
+      queueName: "PopulateMovieRequestQueue",
+    });
+    this.topic.addSubscription(new subscriptions.SqsSubscription(this.queue));
   }
 }
 
