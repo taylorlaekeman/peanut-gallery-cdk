@@ -58,8 +58,6 @@ class PeanutGalleryApi extends Construct {
   constructor(scope: Construct) {
     super(scope, "Api");
 
-    const lambda = new PeanutGalleryGraphqlLambda(this);
-
     const moviesTable = new dynamodb.TableV2(this, "Movies", {
       globalSecondaryIndexes: [
         {
@@ -85,10 +83,13 @@ class PeanutGalleryApi extends Construct {
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       tableName: "PeanutGalleryMovies",
     });
-    lambda.grantMovieTablePermissions(moviesTable);
+    const populateMovieBus = new PopulateMovieMessageBus(this);
 
-    const populateMoviesBus = new PopulateMovieMessageBus(this);
-    lambda.grantPopulateMovieRequestTopicPermissions(populateMoviesBus.topic);
+    const lambda = new PeanutGalleryGraphqlLambda(this, {
+      populateMovieRequestTopicArn: populateMovieBus.topic.topicArn,
+    });
+    lambda.grantMovieTablePermissions(moviesTable);
+    lambda.grantPopulateMovieRequestTopicPermissions(populateMovieBus.topic);
 
     const api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
@@ -117,7 +118,10 @@ class PeanutGalleryApi extends Construct {
 class PeanutGalleryGraphqlLambda extends Construct {
   lambda: lambda.Function;
 
-  constructor(scope: Construct) {
+  constructor(
+    scope: Construct,
+    { populateMovieRequestTopicArn }: { populateMovieRequestTopicArn: string }
+  ) {
     super(scope, "GraphqlLambda");
 
     const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
@@ -131,7 +135,10 @@ class PeanutGalleryGraphqlLambda extends Construct {
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      environment: { TMDB_API_KEY: tmdbApiKeyParameter.stringValue },
+      environment: {
+        MOVIE_POPULATION_REQUEST_TOPIC_ARN: populateMovieRequestTopicArn,
+        TMDB_API_KEY: tmdbApiKeyParameter.stringValue,
+      },
       functionName: "PeanutGalleryGraphQL",
       handler: "index.handler",
       runtime: lambda.Runtime.NODEJS_18_X,
