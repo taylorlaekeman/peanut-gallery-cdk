@@ -91,7 +91,7 @@ class ServerCodeBucket extends Construct {
       bucketName: "peanut-gallery-server-code",
     });
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
-      sources: [s3deploy.Source.asset(path.join(__dirname, "code.zip"))],
+      sources: [s3deploy.Source.asset("./code.zip")],
       destinationBucket: this.bucket,
     });
   }
