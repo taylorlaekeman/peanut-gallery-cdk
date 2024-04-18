@@ -13,6 +13,8 @@ import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as path from "path";
+
 import { Construct } from "constructs";
 
 export class PeanutGalleryCdkStack extends cdk.Stack {
@@ -89,7 +91,7 @@ class ServerCodeBucket extends Construct {
       bucketName: "peanut-gallery-server-code",
     });
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
-      sources: [s3deploy.Source.asset("./code.zip")],
+      sources: [s3deploy.Source.asset(path.join(__dirname, "code.zip"))],
       destinationBucket: this.bucket,
     });
   }
