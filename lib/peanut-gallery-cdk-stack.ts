@@ -17,8 +17,8 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    const ui = new PeanutGalleryUi(this);
-    const api = new PeanutGalleryApi(this);
+    new PeanutGalleryUi(this);
+    new PeanutGalleryServer(this);
   }
 }
 
@@ -55,15 +55,38 @@ class PeanutGalleryUi extends Construct {
   }
 }
 
-class PeanutGalleryApi extends Construct {
+class PeanutGalleryServer extends Construct {
   constructor(scope: Construct) {
-    super(scope, "Api");
+    super(scope, "Server");
 
-    new s3.Bucket(this, "GraphQLCodeBucket", {
-      bucketName: "peanut-gallery-graphql-code",
+    const codeBucket = new s3.Bucket(this, "ServerCodeBucket", {
+      bucketName: "peanut-gallery-server-code",
     });
 
-    const moviesTable = new dynamodb.TableV2(this, "Movies", {
+    const movieTable = new MovieTable(this);
+    const populateMovieBus = new PopulateMovieRequestBus(this);
+
+    const graphqlLambda = new GraphqlLambda(this, {
+      codeBucket: codeBucket,
+      moviePopulationRequestTopic: populateMovieBus.topic,
+      movieTable: movieTable.table,
+    });
+    new MoviePopulationLambda(this, {
+      codeBucket,
+      moviePopulationRequestQueue: populateMovieBus.queue,
+      movieTable: movieTable.table,
+    });
+    new Api(this, { graphqlLambda: graphqlLambda.lambda });
+  }
+}
+
+class MovieTable extends Construct {
+  readonly table: dynamodb.TableV2;
+
+  constructor(scope: Construct) {
+    super(scope, "MovieTable");
+
+    this.table = new dynamodb.TableV2(this, "Movies", {
       globalSecondaryIndexes: [
         {
           indexName: "moviesByScore",
@@ -88,19 +111,122 @@ class PeanutGalleryApi extends Construct {
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       tableName: "PeanutGalleryMovies",
     });
-    const populateMovieBus = new PopulateMovieMessageBus(this);
+  }
+}
 
-    const graphqlLambda = new PeanutGalleryGraphqlLambda(this, {
-      populateMovieRequestTopicArn: populateMovieBus.topic.topicArn,
+class GraphqlLambda extends Construct {
+  readonly lambda: lambda.Function;
+
+  constructor(
+    scope: Construct,
+    {
+      codeBucket,
+      moviePopulationRequestTopic,
+      movieTable,
+    }: {
+      codeBucket: s3.Bucket;
+      moviePopulationRequestTopic: sns.Topic;
+      movieTable: dynamodb.TableV2;
+    }
+  ) {
+    super(scope, "GraphqlLambda");
+
+    const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
+      parameterName: "PeanutGalleryTmdbApiKey",
+      stringValue: "placeholder-tmdb-api-key",
     });
-    graphqlLambda.grantMovieTablePermissions(moviesTable);
-    graphqlLambda.grantPopulateMovieRequestTopicPermissions(
-      populateMovieBus.topic
+
+    this.lambda = new lambda.Function(this, "GraphqlLambda", {
+      code: lambda.Code.fromBucket(codeBucket, "code.zip"),
+      environment: {
+        MOVIE_POPULATION_REQUEST_TOPIC_ARN:
+          moviePopulationRequestTopic.topicArn,
+        TMDB_API_KEY: tmdbApiKeyParameter.stringValue,
+      },
+      functionName: "PeanutGalleryGraphQL",
+      handler: "index.handler",
+      initialPolicy: [
+        new iam.PolicyStatement({
+          actions: ["dynamodb:Query", "dynamodb:PutItem"],
+          effect: iam.Effect.ALLOW,
+          resources: [movieTable.tableArn, `${movieTable.tableArn}/index/*`],
+        }),
+        new iam.PolicyStatement({
+          actions: ["sns:Publish"],
+          effect: iam.Effect.ALLOW,
+          resources: [moviePopulationRequestTopic.topicArn],
+        }),
+      ],
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    this.lambda.addLayers(
+      lambda.LayerVersion.fromLayerVersionArn(
+        this,
+        "ParametersAndSecretsLambdaExtension",
+        "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
+      )
     );
-    new MoviePopulationLambda(this, {
-      moviePopulationRequestQueue: populateMovieBus.queue,
-      movieTable: moviesTable,
+  }
+}
+
+class MoviePopulationLambda extends Construct {
+  constructor(
+    scope: Construct,
+    {
+      codeBucket,
+      moviePopulationRequestQueue,
+      movieTable,
+    }: {
+      codeBucket: s3.Bucket;
+      moviePopulationRequestQueue: sqs.Queue;
+      movieTable: dynamodb.TableV2;
+    }
+  ) {
+    super(scope, "MoviePopulationLambda");
+
+    new lambda.Function(this, "MoviePopulationLambda", {
+      code: lambda.Code.fromBucket(codeBucket, "code.zip"),
+      events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
+      functionName: "PeanutGalleryMoviePopulationLambda",
+      handler: "moviePopulationHandler.handler",
+      initialPolicy: [
+        new iam.PolicyStatement({
+          actions: ["dynamodb:PutItem"],
+          effect: iam.Effect.ALLOW,
+          resources: [movieTable.tableArn],
+        }),
+      ],
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(30),
     });
+  }
+}
+
+class PopulateMovieRequestBus extends Construct {
+  readonly topic: sns.Topic;
+  readonly queue: sqs.Queue;
+
+  constructor(scope: Construct) {
+    super(scope, "PopulateMovieRequestBus");
+
+    this.topic = new sns.Topic(this, "PopulateMovieRequestTopic", {
+      topicName: "PopulateMovieRequestTopic",
+    });
+    this.queue = new sqs.Queue(this, "PopulateMovieRequestQueue", {
+      queueName: "PopulateMovieRequestQueue",
+    });
+    this.topic.addSubscription(new subscriptions.SqsSubscription(this.queue));
+  }
+}
+
+class Api extends Construct {
+  constructor(
+    scope: Construct,
+    { graphqlLambda }: { graphqlLambda: lambda.Function }
+  ) {
+    super(scope, "Api");
 
     const api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
@@ -118,115 +244,10 @@ class PeanutGalleryApi extends Construct {
     });
 
     const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
-      graphqlLambda.lambda,
+      graphqlLambda,
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
     api.root.addMethod("POST", gatewayLambdaIntegration);
   }
 }
-
-class PeanutGalleryGraphqlLambda extends Construct {
-  lambda: lambda.Function;
-
-  constructor(
-    scope: Construct,
-    { populateMovieRequestTopicArn }: { populateMovieRequestTopicArn: string }
-  ) {
-    super(scope, "GraphqlLambda");
-
-    const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
-      parameterName: "PeanutGalleryTmdbApiKey",
-      stringValue: "placeholder-tmdb-api-key",
-    });
-
-    this.lambda = new lambda.Function(this, "GraphqlLambda", {
-      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      environment: {
-        MOVIE_POPULATION_REQUEST_TOPIC_ARN: populateMovieRequestTopicArn,
-        TMDB_API_KEY: tmdbApiKeyParameter.stringValue,
-      },
-      functionName: "PeanutGalleryGraphQL",
-      handler: "index.handler",
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(30),
-    });
-
-    this.lambda.addLayers(
-      lambda.LayerVersion.fromLayerVersionArn(
-        this,
-        "ParametersAndSecretsLambdaExtension",
-        "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
-      )
-    );
-  }
-
-  grantMovieTablePermissions(table: dynamodb.TableV2) {
-    const policyStatement = new iam.PolicyStatement({
-      actions: ["dynamodb:Query", "dynamodb:PutItem"],
-      effect: iam.Effect.ALLOW,
-      resources: [table.tableArn, `${table.tableArn}/index/*`],
-    });
-    this.lambda.addToRolePolicy(policyStatement);
-  }
-
-  grantPopulateMovieRequestTopicPermissions(topic: sns.Topic) {
-    const policyStatement = new iam.PolicyStatement({
-      actions: ["sns:Publish"],
-      effect: iam.Effect.ALLOW,
-      resources: [topic.topicArn],
-    });
-    this.lambda.addToRolePolicy(policyStatement);
-  }
-}
-
-class MoviePopulationLambda extends Construct {
-  constructor(
-    scope: Construct,
-    {
-      moviePopulationRequestQueue,
-      movieTable,
-    }: { moviePopulationRequestQueue: sqs.Queue; movieTable: dynamodb.TableV2 }
-  ) {
-    super(scope, "MoviePopulationLambda");
-
-    new lambda.Function(this, "MoviePopulationLambda", {
-      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
-      functionName: "PeanutGalleryMoviePopulationLambda",
-      handler: "moviePopulationHandler.handler",
-      initialPolicy: [
-        new iam.PolicyStatement({
-          actions: ["dynamodb:PutItem"],
-          effect: iam.Effect.ALLOW,
-          resources: [movieTable.tableArn],
-        }),
-      ],
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(30),
-    });
-  }
-}
-
-class PopulateMovieMessageBus extends Construct {
-  readonly topic: sns.Topic;
-  readonly queue: sqs.Queue;
-
-  constructor(scope: Construct) {
-    super(scope, "PopulateMovieMessageBus");
-
-    this.topic = new sns.Topic(this, "PopulateMovieRequestTopic", {
-      topicName: "PopulateMovieRequestTopic",
-    });
-    this.queue = new sqs.Queue(this, "PopulateMovieRequestQueue", {
-      queueName: "PopulateMovieRequestQueue",
-    });
-    this.topic.addSubscription(new subscriptions.SqsSubscription(this.queue));
-  }
-}
-
-const DEFAULT_HANDLER_CODE = `
-exports.handler = async () => {
-  console.log('default handler not yet overwritten');
-};
-`;
