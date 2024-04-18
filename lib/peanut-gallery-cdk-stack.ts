@@ -89,12 +89,7 @@ class ServerCodeBucket extends Construct {
       bucketName: "peanut-gallery-server-code",
     });
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
-      sources: [
-        s3deploy.Source.data(
-          "code.zip",
-          `exports.handler = async () => { console.log('default handler not yet overwritten'); };`
-        ),
-      ],
+      sources: [s3deploy.Source.asset("./code.zip")],
       destinationBucket: this.bucket,
     });
   }
