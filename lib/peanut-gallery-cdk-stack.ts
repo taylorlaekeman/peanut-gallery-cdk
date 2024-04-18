@@ -6,6 +6,7 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
@@ -58,6 +59,10 @@ class PeanutGalleryApi extends Construct {
   constructor(scope: Construct) {
     super(scope, "Api");
 
+    new s3.Bucket(this, "GraphQLCodeBucket", {
+      bucketName: "peanut-gallery-graphql-code",
+    });
+
     const moviesTable = new dynamodb.TableV2(this, "Movies", {
       globalSecondaryIndexes: [
         {
@@ -85,11 +90,17 @@ class PeanutGalleryApi extends Construct {
     });
     const populateMovieBus = new PopulateMovieMessageBus(this);
 
-    const lambda = new PeanutGalleryGraphqlLambda(this, {
+    const graphqlLambda = new PeanutGalleryGraphqlLambda(this, {
       populateMovieRequestTopicArn: populateMovieBus.topic.topicArn,
     });
-    lambda.grantMovieTablePermissions(moviesTable);
-    lambda.grantPopulateMovieRequestTopicPermissions(populateMovieBus.topic);
+    graphqlLambda.grantMovieTablePermissions(moviesTable);
+    graphqlLambda.grantPopulateMovieRequestTopicPermissions(
+      populateMovieBus.topic
+    );
+    new MoviePopulationLambda(this, {
+      moviePopulationRequestQueue: populateMovieBus.queue,
+      movieTable: moviesTable,
+    });
 
     const api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
@@ -107,7 +118,7 @@ class PeanutGalleryApi extends Construct {
     });
 
     const gatewayLambdaIntegration = new apigateway.LambdaIntegration(
-      lambda.lambda,
+      graphqlLambda.lambda,
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
@@ -127,10 +138,6 @@ class PeanutGalleryGraphqlLambda extends Construct {
     const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
       parameterName: "PeanutGalleryTmdbApiKey",
       stringValue: "placeholder-tmdb-api-key",
-    });
-
-    new s3.Bucket(this, "GraphQLCodeBucket", {
-      bucketName: "peanut-gallery-graphql-code",
     });
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
@@ -170,6 +177,34 @@ class PeanutGalleryGraphqlLambda extends Construct {
       resources: [topic.topicArn],
     });
     this.lambda.addToRolePolicy(policyStatement);
+  }
+}
+
+class MoviePopulationLambda extends Construct {
+  constructor(
+    scope: Construct,
+    {
+      moviePopulationRequestQueue,
+      movieTable,
+    }: { moviePopulationRequestQueue: sqs.Queue; movieTable: dynamodb.TableV2 }
+  ) {
+    super(scope, "MoviePopulationLambda");
+
+    new lambda.Function(this, "MoviePopulationLambda", {
+      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+      events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
+      functionName: "PeanutGalleryMoviePopulationLambda",
+      handler: "moviePopulationHandler.handler",
+      initialPolicy: [
+        new iam.PolicyStatement({
+          actions: ["dynamodb:PutItem"],
+          effect: iam.Effect.ALLOW,
+          resources: [movieTable.tableArn],
+        }),
+      ],
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(30),
+    });
   }
 }
 
