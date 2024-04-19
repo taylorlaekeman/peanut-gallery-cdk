@@ -92,14 +92,15 @@ class ServerCodeBucket extends Construct {
     this.bucket = new s3.Bucket(this, "ServerCodeBucket", {
       bucketName: "peanut-gallery-server-code",
     });
+    /*
     new assets.Asset(this, "InitialLambdaCode", {
       path: path.join(__dirname, "../assets/code.zip"),
     });
+    */
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
       destinationBucket: this.bucket,
-      extract: false,
       sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../assets/code.zip")),
+        s3deploy.Source.asset(path.join(__dirname, "../assets/initial-code")),
       ],
     });
   }
