@@ -96,10 +96,11 @@ class ServerCodeBucket extends Construct {
       path: path.join(__dirname, "../assets/code.zip"),
     });
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
+      destinationBucket: this.bucket,
+      extract: false,
       sources: [
         s3deploy.Source.asset(path.join(__dirname, "../assets/code.zip")),
       ],
-      destinationBucket: this.bucket,
     });
   }
 }
