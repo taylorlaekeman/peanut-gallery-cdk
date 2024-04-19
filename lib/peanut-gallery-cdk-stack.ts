@@ -177,6 +177,7 @@ class GraphqlLambda extends Construct {
       timeout: cdk.Duration.seconds(30),
     });
 
+    /*
     this.lambda.addLayers(
       lambda.LayerVersion.fromLayerVersionArn(
         this,
@@ -184,6 +185,7 @@ class GraphqlLambda extends Construct {
         "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
       )
     );
+    */
   }
 }
 
