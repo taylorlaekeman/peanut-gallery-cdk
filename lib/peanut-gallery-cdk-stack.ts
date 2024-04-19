@@ -277,10 +277,10 @@ class DomainRouting extends Construct {
     }: { api: apigateway.RestApi; uiDistribution: cloudfront.Distribution }
   ) {
     super(scope, "DomainRouting");
-    const hostedZone = route53.HostedZone.fromHostedZoneId(
+    const hostedZone = route53.HostedZone.fromLookup(
       this,
       "TaylorLaekemanHostedZone",
-      "Z06013313634UKOQV70LA"
+      { domainName: "taylorlaekeman.com" }
     );
     new route53.ARecord(this, "ApiARecord", {
       recordName: "api.peanutgallery",
