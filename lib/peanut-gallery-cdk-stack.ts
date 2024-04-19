@@ -8,6 +8,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as assets from "aws-cdk-lib/aws-s3-assets";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
@@ -67,17 +68,19 @@ class PeanutGalleryServer extends Construct {
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
 
+    /*
     const graphqlLambda = new GraphqlLambda(this, {
       codeBucket: codeBucket.bucket,
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
     });
+    new Api(this, { graphqlLambda: graphqlLambda.lambda });
     new MoviePopulationLambda(this, {
       codeBucket: codeBucket.bucket,
       moviePopulationRequestQueue: populateMovieBus.queue,
       movieTable: movieTable.table,
     });
-    new Api(this, { graphqlLambda: graphqlLambda.lambda });
+    */
   }
 }
 
@@ -90,8 +93,13 @@ class ServerCodeBucket extends Construct {
     this.bucket = new s3.Bucket(this, "ServerCodeBucket", {
       bucketName: "peanut-gallery-server-code",
     });
+    new assets.Asset(this, "InitialLambdaCode", {
+      path: path.join(__dirname, "../assets/code.zip"),
+    });
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
-      sources: [s3deploy.Source.asset("./code.zip")],
+      sources: [
+        s3deploy.Source.asset(path.join(__dirname, "../assets/code.zip")),
+      ],
       destinationBucket: this.bucket,
     });
   }
