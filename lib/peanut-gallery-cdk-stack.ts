@@ -21,7 +21,7 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    new PeanutGalleryUi(this);
+    // new PeanutGalleryUi(this);
     new PeanutGalleryServer(this);
   }
 }
