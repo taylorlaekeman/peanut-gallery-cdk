@@ -7,6 +7,8 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53targets from "aws-cdk-lib/aws-route53-targets";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as sns from "aws-cdk-lib/aws-sns";
@@ -20,12 +22,18 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    new PeanutGalleryUi(this);
-    new PeanutGalleryServer(this);
+    const ui = new PeanutGalleryUi(this);
+    const server = new PeanutGalleryServer(this);
+    new DomainRouting(this, {
+      api: server.api,
+      uiDistribution: ui.distribution,
+    });
   }
 }
 
 class PeanutGalleryUi extends Construct {
+  readonly distribution: cloudfront.Distribution;
+
   constructor(scope: Construct) {
     super(scope, "Ui");
 
@@ -42,7 +50,7 @@ class PeanutGalleryUi extends Construct {
       websiteIndexDocument: "index.html",
     });
 
-    const distribution = new cloudfront.Distribution(this, "Cdn", {
+    this.distribution = new cloudfront.Distribution(this, "Cdn", {
       certificate: certificatemanager.Certificate.fromCertificateArn(
         this,
         "TaylorLaekemanDomainCertificate",
@@ -59,6 +67,8 @@ class PeanutGalleryUi extends Construct {
 }
 
 class PeanutGalleryServer extends Construct {
+  readonly api: apigateway.RestApi;
+
   constructor(scope: Construct) {
     super(scope, "Server");
 
@@ -69,11 +79,12 @@ class PeanutGalleryServer extends Construct {
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
     });
-    new Api(this, { graphqlLambda: graphqlLambda.lambda });
+    const api = new Api(this, { graphqlLambda: graphqlLambda.lambda });
     new MoviePopulationLambda(this, {
       moviePopulationRequestQueue: populateMovieBus.queue,
       movieTable: movieTable.table,
     });
+    this.api = api.api;
   }
 }
 
@@ -225,13 +236,15 @@ class PopulateMovieRequestBus extends Construct {
 }
 
 class Api extends Construct {
+  readonly api: apigateway.RestApi;
+
   constructor(
     scope: Construct,
     { graphqlLambda }: { graphqlLambda: lambda.Function }
   ) {
     super(scope, "Api");
 
-    const api = new apigateway.RestApi(this, "Gateway", {
+    this.api = new apigateway.RestApi(this, "Gateway", {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
       },
@@ -251,7 +264,38 @@ class Api extends Construct {
       { requestTemplates: { "application/json": '{ "statusCode": "200" }' } }
     );
 
-    api.root.addMethod("POST", gatewayLambdaIntegration);
+    this.api.root.addMethod("POST", gatewayLambdaIntegration);
+  }
+}
+
+class DomainRouting extends Construct {
+  constructor(
+    scope: Construct,
+    {
+      api,
+      uiDistribution,
+    }: { api: apigateway.RestApi; uiDistribution: cloudfront.Distribution }
+  ) {
+    super(scope, "DomainRouting");
+    const hostedZone = route53.HostedZone.fromHostedZoneId(
+      this,
+      "TaylorLaekemanHostedZone",
+      "Z06013313634UKOQV70LA"
+    );
+    new route53.ARecord(this, "ApiARecord", {
+      recordName: "api.peanutgallery",
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.ApiGateway(api)
+      ),
+      zone: hostedZone,
+    });
+    new route53.ARecord(this, "UiARecord", {
+      recordName: "peanutgallery",
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.CloudFrontTarget(uiDistribution)
+      ),
+      zone: hostedZone,
+    });
   }
 }
 
