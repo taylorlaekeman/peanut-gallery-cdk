@@ -67,7 +67,7 @@ class PeanutGalleryServer extends Construct {
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
     const graphqlLambda = new GraphqlLambda(this, {
-      codeBucket: codeBucket.bucket,
+      codeBucket,
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
     });
@@ -84,6 +84,7 @@ class PeanutGalleryServer extends Construct {
 
 class ServerCodeBucket extends Construct {
   readonly bucket: s3.Bucket;
+  readonly initialDeployment: s3deploy.BucketDeployment;
 
   constructor(scope: Construct) {
     super(scope, "ServerCodeBucket");
@@ -91,12 +92,16 @@ class ServerCodeBucket extends Construct {
     this.bucket = new s3.Bucket(this, "ServerCodeBucket", {
       bucketName: "peanut-gallery-server-code",
     });
-    new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
-      destinationBucket: this.bucket,
-      sources: [
-        s3deploy.Source.asset(path.join(__dirname, "../assets/initial-code")),
-      ],
-    });
+    this.initialDeployment = new s3deploy.BucketDeployment(
+      this,
+      "ServerCodeBucketInitialDeployment",
+      {
+        destinationBucket: this.bucket,
+        sources: [
+          s3deploy.Source.asset(path.join(__dirname, "../assets/initial-code")),
+        ],
+      }
+    );
   }
 }
 
@@ -144,7 +149,7 @@ class GraphqlLambda extends Construct {
       moviePopulationRequestTopic,
       movieTable,
     }: {
-      codeBucket: s3.Bucket;
+      codeBucket: ServerCodeBucket;
       moviePopulationRequestTopic: sns.Topic;
       movieTable: dynamodb.TableV2;
     }
@@ -157,7 +162,7 @@ class GraphqlLambda extends Construct {
     });
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
-      code: lambda.Code.fromBucket(codeBucket, "code.zip"),
+      code: lambda.Code.fromBucket(codeBucket.bucket, "code.zip"),
       environment: {
         MOVIE_POPULATION_REQUEST_TOPIC_ARN:
           moviePopulationRequestTopic.topicArn,
@@ -180,6 +185,7 @@ class GraphqlLambda extends Construct {
       runtime: lambda.Runtime.NODEJS_18_X,
       timeout: cdk.Duration.seconds(30),
     });
+    this.lambda.node.addDependency(codeBucket.initialDeployment);
 
     this.lambda.addLayers(
       lambda.LayerVersion.fromLayerVersionArn(
