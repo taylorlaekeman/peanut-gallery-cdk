@@ -8,7 +8,6 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as assets from "aws-cdk-lib/aws-s3-assets";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
@@ -65,7 +64,6 @@ class PeanutGalleryServer extends Construct {
 
     const codeBucket = new ServerCodeBucket(this);
 
-    /*
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
     const graphqlLambda = new GraphqlLambda(this, {
@@ -73,6 +71,7 @@ class PeanutGalleryServer extends Construct {
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
     });
+    /*
     new Api(this, { graphqlLambda: graphqlLambda.lambda });
     new MoviePopulationLambda(this, {
       codeBucket: codeBucket.bucket,
@@ -92,11 +91,6 @@ class ServerCodeBucket extends Construct {
     this.bucket = new s3.Bucket(this, "ServerCodeBucket", {
       bucketName: "peanut-gallery-server-code",
     });
-    /*
-    new assets.Asset(this, "InitialLambdaCode", {
-      path: path.join(__dirname, "../assets/code.zip"),
-    });
-    */
     new s3deploy.BucketDeployment(this, "ServerCodeBucketInitialDeployment", {
       destinationBucket: this.bucket,
       sources: [
