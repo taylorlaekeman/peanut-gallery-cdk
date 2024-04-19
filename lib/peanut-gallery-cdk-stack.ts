@@ -65,10 +65,9 @@ class PeanutGalleryServer extends Construct {
 
     const codeBucket = new ServerCodeBucket(this);
 
+    /*
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
-
-    /*
     const graphqlLambda = new GraphqlLambda(this, {
       codeBucket: codeBucket.bucket,
       moviePopulationRequestTopic: populateMovieBus.topic,
