@@ -20,7 +20,7 @@ import { Construct } from "constructs";
 export class PeanutGalleryCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    // new PeanutGalleryUi(this);
+    new PeanutGalleryUi(this);
     new PeanutGalleryServer(this);
   }
 }
@@ -63,45 +63,27 @@ class PeanutGalleryServer extends Construct {
     super(scope, "Server");
 
     const codeBucket = new ServerCodeBucket(this);
-
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
     const graphqlLambda = new GraphqlLambda(this, {
-      codeBucket,
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
     });
-    /*
     new Api(this, { graphqlLambda: graphqlLambda.lambda });
     new MoviePopulationLambda(this, {
-      codeBucket: codeBucket.bucket,
       moviePopulationRequestQueue: populateMovieBus.queue,
       movieTable: movieTable.table,
     });
-    */
   }
 }
 
 class ServerCodeBucket extends Construct {
-  readonly bucket: s3.Bucket;
-  readonly initialDeployment: s3deploy.BucketDeployment;
-
   constructor(scope: Construct) {
     super(scope, "ServerCodeBucket");
 
-    this.bucket = new s3.Bucket(this, "ServerCodeBucket", {
+    new s3.Bucket(this, "ServerCodeBucket", {
       bucketName: "peanut-gallery-server-code",
     });
-    this.initialDeployment = new s3deploy.BucketDeployment(
-      this,
-      "ServerCodeBucketInitialDeployment",
-      {
-        destinationBucket: this.bucket,
-        sources: [
-          s3deploy.Source.asset(path.join(__dirname, "../assets/initial-code")),
-        ],
-      }
-    );
   }
 }
 
@@ -145,11 +127,9 @@ class GraphqlLambda extends Construct {
   constructor(
     scope: Construct,
     {
-      codeBucket,
       moviePopulationRequestTopic,
       movieTable,
     }: {
-      codeBucket: ServerCodeBucket;
       moviePopulationRequestTopic: sns.Topic;
       movieTable: dynamodb.TableV2;
     }
@@ -162,7 +142,7 @@ class GraphqlLambda extends Construct {
     });
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
-      code: lambda.Code.fromBucket(codeBucket.bucket, "code.zip"),
+      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
       environment: {
         MOVIE_POPULATION_REQUEST_TOPIC_ARN:
           moviePopulationRequestTopic.topicArn,
@@ -185,7 +165,6 @@ class GraphqlLambda extends Construct {
       runtime: lambda.Runtime.NODEJS_18_X,
       timeout: cdk.Duration.seconds(30),
     });
-    this.lambda.node.addDependency(codeBucket.initialDeployment);
 
     this.lambda.addLayers(
       lambda.LayerVersion.fromLayerVersionArn(
@@ -201,11 +180,9 @@ class MoviePopulationLambda extends Construct {
   constructor(
     scope: Construct,
     {
-      codeBucket,
       moviePopulationRequestQueue,
       movieTable,
     }: {
-      codeBucket: s3.Bucket;
       moviePopulationRequestQueue: sqs.Queue;
       movieTable: dynamodb.TableV2;
     }
@@ -213,7 +190,7 @@ class MoviePopulationLambda extends Construct {
     super(scope, "MoviePopulationLambda");
 
     new lambda.Function(this, "MoviePopulationLambda", {
-      code: lambda.Code.fromBucket(codeBucket, "code.zip"),
+      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
       events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
       functionName: "PeanutGalleryMoviePopulationLambda",
       handler: "moviePopulationHandler.handler",
@@ -277,3 +254,9 @@ class Api extends Construct {
     api.root.addMethod("POST", gatewayLambdaIntegration);
   }
 }
+
+const DEFAULT_HANDLER_CODE = `
+exports.handler = async () => {
+  console.log('default handler not yet overwritten');
+};
+`;
