@@ -155,6 +155,9 @@ class GraphqlLambda extends Construct {
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
       environment: {
+        CONTEXT: "graphql",
+        EXECUTION_ENVIRONMENT: "lambda",
+        MOVIE_TABLE_NAME: movieTable.tableName,
         MOVIE_POPULATION_REQUEST_TOPIC_ARN:
           moviePopulationRequestTopic.topicArn,
         TMDB_API_KEY: tmdbApiKeyParameter.stringValue,
@@ -202,6 +205,11 @@ class MoviePopulationLambda extends Construct {
 
     new lambda.Function(this, "MoviePopulationLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+      environment: {
+        CONTEXT: "movie-population",
+        EXECUTION_ENVIRONMENT: "lambda",
+        MOVIE_TABLE_NAME: movieTable.tableName,
+      },
       events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
       functionName: "PeanutGalleryMoviePopulationLambda",
       handler: "moviePopulationHandler.handler",
