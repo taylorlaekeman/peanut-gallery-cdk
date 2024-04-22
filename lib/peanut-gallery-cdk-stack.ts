@@ -1,9 +1,11 @@
-import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as cdk from "aws-cdk-lib";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as certificatemanager from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as events from "aws-cdk-lib/aws-events";
+import * as eventtargets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as eventsources from "aws-cdk-lib/aws-lambda-event-sources";
@@ -80,11 +82,12 @@ class PeanutGalleryServer extends Construct {
       movieTable: movieTable.table,
     });
     const api = new Api(this, { graphqlLambda: graphqlLambda.lambda });
+    this.api = api.api;
     new MoviePopulationLambda(this, {
       moviePopulationRequestQueue: populateMovieBus.queue,
       movieTable: movieTable.table,
     });
-    this.api = api.api;
+    new MoviePopulationAutoCaller(this, { api: api.api });
   }
 }
 
@@ -222,6 +225,33 @@ class MoviePopulationLambda extends Construct {
       ],
       runtime: lambda.Runtime.NODEJS_18_X,
       timeout: cdk.Duration.seconds(30),
+    });
+  }
+}
+
+class MoviePopulationAutoCaller extends Construct {
+  constructor(scope: Construct, { api }: { api: apigateway.RestApi }) {
+    super(scope, "MoviePopulationAutoCaller");
+    new events.Rule(this, "MoviePopulationAutoCall", {
+      ruleName: "MoviePopulationAutoCall",
+      schedule: events.Schedule.cron({
+        day: "*",
+        hour: "0",
+        minute: "0",
+        month: "*",
+      }),
+      targets: [
+        new eventtargets.ApiGateway(api, {
+          headerParameters: { "content-type": "application/json" },
+          method: "POST",
+          postBody: events.RuleTargetInput.fromObject({
+            operationName: "PopulateMovies",
+            query:
+              "mutation PopulateMovies($endDate: String, $startDate: String) {\n  populateMovies(endDate: $endDate, startDate: $startDate) {\n    initiatedIds\n    __typename\n  }\n}",
+            variables: {},
+          }),
+        }),
+      ],
     });
   }
 }
