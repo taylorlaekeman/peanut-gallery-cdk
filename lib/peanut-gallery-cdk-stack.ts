@@ -77,15 +77,18 @@ class PeanutGalleryServer extends Construct {
     const codeBucket = new ServerCodeBucket(this);
     const movieTable = new MovieTable(this);
     const populateMovieBus = new PopulateMovieRequestBus(this);
+    const parameters = new Parameters(this);
     const graphqlLambda = new GraphqlLambda(this, {
       moviePopulationRequestTopic: populateMovieBus.topic,
       movieTable: movieTable.table,
+      tmdbApiKey: parameters.tmdbApiKey,
     });
     const api = new Api(this, { graphqlLambda: graphqlLambda.lambda });
     this.api = api.api;
     new MoviePopulationLambda(this, {
       moviePopulationRequestQueue: populateMovieBus.queue,
       movieTable: movieTable.table,
+      tmdbApiKey: parameters.tmdbApiKey,
     });
     new MoviePopulationAutoCaller(this, { api: api.api });
   }
@@ -135,6 +138,18 @@ class MovieTable extends Construct {
   }
 }
 
+class Parameters extends Construct {
+  readonly tmdbApiKey: ssm.StringParameter;
+
+  constructor(scope: Construct) {
+    super(scope, "Parameters");
+    this.tmdbApiKey = new ssm.StringParameter(this, "TmdbApiKey", {
+      parameterName: "PeanutGalleryTmdbApiKey",
+      stringValue: "placeholder-tmdb-api-key",
+    });
+  }
+}
+
 class GraphqlLambda extends Construct {
   readonly lambda: lambda.Function;
 
@@ -143,17 +158,14 @@ class GraphqlLambda extends Construct {
     {
       moviePopulationRequestTopic,
       movieTable,
+      tmdbApiKey,
     }: {
       moviePopulationRequestTopic: sns.Topic;
       movieTable: dynamodb.TableV2;
+      tmdbApiKey: ssm.StringParameter;
     }
   ) {
     super(scope, "GraphqlLambda");
-
-    const tmdbApiKeyParameter = new ssm.StringParameter(this, "TmdbApiKey", {
-      parameterName: "PeanutGalleryTmdbApiKey",
-      stringValue: "placeholder-tmdb-api-key",
-    });
 
     this.lambda = new lambda.Function(this, "GraphqlLambda", {
       code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
@@ -163,7 +175,7 @@ class GraphqlLambda extends Construct {
         MOVIE_TABLE_NAME: movieTable.tableName,
         MOVIE_POPULATION_REQUEST_TOPIC_ARN:
           moviePopulationRequestTopic.topicArn,
-        TMDB_API_KEY: tmdbApiKeyParameter.stringValue,
+        TMDB_API_KEY: tmdbApiKey.stringValue,
       },
       functionName: "PeanutGalleryGraphQL",
       handler: "index.handler",
@@ -199,33 +211,48 @@ class MoviePopulationLambda extends Construct {
     {
       moviePopulationRequestQueue,
       movieTable,
+      tmdbApiKey,
     }: {
       moviePopulationRequestQueue: sqs.Queue;
       movieTable: dynamodb.TableV2;
+      tmdbApiKey: ssm.StringParameter;
     }
   ) {
     super(scope, "MoviePopulationLambda");
 
-    new lambda.Function(this, "MoviePopulationLambda", {
-      code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
-      environment: {
-        CONTEXT: "movie-population",
-        EXECUTION_ENVIRONMENT: "lambda",
-        MOVIE_TABLE_NAME: movieTable.tableName,
-      },
-      events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
-      functionName: "PeanutGalleryMoviePopulationLambda",
-      handler: "moviePopulationHandler.handler",
-      initialPolicy: [
-        new iam.PolicyStatement({
-          actions: ["dynamodb:PutItem"],
-          effect: iam.Effect.ALLOW,
-          resources: [movieTable.tableArn],
-        }),
-      ],
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(30),
-    });
+    const populationLambda = new lambda.Function(
+      this,
+      "MoviePopulationLambda",
+      {
+        code: lambda.Code.fromInline(DEFAULT_HANDLER_CODE),
+        environment: {
+          CONTEXT: "movie-population",
+          EXECUTION_ENVIRONMENT: "lambda",
+          MOVIE_TABLE_NAME: movieTable.tableName,
+          TMDB_API_KEY: tmdbApiKey.stringValue,
+        },
+        events: [new eventsources.SqsEventSource(moviePopulationRequestQueue)],
+        functionName: "PeanutGalleryMoviePopulationLambda",
+        handler: "moviePopulationHandler.handler",
+        initialPolicy: [
+          new iam.PolicyStatement({
+            actions: ["dynamodb:PutItem"],
+            effect: iam.Effect.ALLOW,
+            resources: [movieTable.tableArn],
+          }),
+        ],
+        runtime: lambda.Runtime.NODEJS_18_X,
+        timeout: cdk.Duration.seconds(30),
+      }
+    );
+
+    populationLambda.addLayers(
+      lambda.LayerVersion.fromLayerVersionArn(
+        this,
+        "ParametersAndSecretsLambdaExtension",
+        "arn:aws:lambda:us-east-2:590474943231:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
+      )
+    );
   }
 }
 
