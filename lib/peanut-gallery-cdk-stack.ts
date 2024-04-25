@@ -266,7 +266,11 @@ class PopulateMovieRequestBus extends Construct {
     this.topic = new sns.Topic(this, "PopulateMovieRequestTopic", {
       topicName: "PopulateMovieRequestTopic",
     });
+    const dlq = new sqs.Queue(this, "PopulateMovieRequestDLQ", {
+      queueName: "PopulateMovieRequestDLQ",
+    });
     this.queue = new sqs.Queue(this, "PopulateMovieRequestQueue", {
+      deadLetterQueue: { maxReceiveCount: 3, queue: dlq },
       queueName: "PopulateMovieRequestQueue",
     });
     this.topic.addSubscription(new subscriptions.SqsSubscription(this.queue));
